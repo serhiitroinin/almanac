@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { setSecret } from "./keychain.ts";
-import { writeConfig } from "./config.ts";
+import { readConfig, writeConfig } from "./config.ts";
 import type { AccountConfig } from "./accounts.ts";
 
 // Legacy luff locations.
@@ -42,16 +42,22 @@ export function importFromLuff(): ImportSummary {
   const copied: string[] = [];
   const missing: string[] = [];
 
-  // 1. Account registry — Google accounts only.
+  // 1. Account registry — Google accounts only; merge into any existing almanac
+  //    accounts rather than overwriting (idempotent, preserves almanac-native ones).
   let accounts: AccountConfig[] = [];
   if (existsSync(LUFF_ACCOUNTS)) {
     try {
       const all = JSON.parse(readFileSync(LUFF_ACCOUNTS, "utf-8")) as AccountConfig[];
       accounts = all.filter((a) => a.provider === "google");
-      writeConfig("accounts", accounts);
     } catch {
       /* leave accounts empty */
     }
+  }
+  if (accounts.length) {
+    const byAlias = new Map<string, AccountConfig>();
+    for (const a of readConfig<AccountConfig[]>("accounts") ?? []) byAlias.set(a.alias, a);
+    for (const a of accounts) if (!byAlias.has(a.alias)) byAlias.set(a.alias, a);
+    writeConfig("accounts", [...byAlias.values()]);
   }
 
   // 2. OAuth app credentials (shared across Google accounts).

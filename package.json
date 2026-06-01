@@ -1,6 +1,6 @@
 {
   "name": "almanac",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Google Calendar CLI — multi-account agenda, events, scheduling from your shell",
   "module": "src/cli.ts",
   "type": "module",

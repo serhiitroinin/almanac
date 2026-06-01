@@ -10,7 +10,9 @@ import {
 } from "./lib/oauth2.ts";
 import * as out from "./lib/output.ts";
 import { error as showError } from "./lib/output.ts";
+import { deleteSecret } from "./lib/keychain.ts";
 import { importFromLuff } from "./lib/import-luff.ts";
+import { readSecret } from "./lib/prompt.ts";
 import {
   googleCalendarProvider,
   CALENDAR_OAUTH2_CONFIG,
@@ -91,12 +93,14 @@ async function oauthCallbackFlow(
 ): Promise<{ code: string; redirectUri: string }> {
   return new Promise((resolve, reject) => {
     let redirectUri = "";
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const server = Bun.serve({
       port: 0,
       fetch(req) {
         const url = new URL(req.url);
         const error = url.searchParams.get("error");
         if (error) {
+          clearTimeout(timeoutId);
           reject(new Error(`OAuth2 error: ${error}`));
           setTimeout(() => server.stop(), 100);
           return new Response(`Authentication failed: ${error}. Close this tab.`, {
@@ -111,12 +115,14 @@ async function oauthCallbackFlow(
           });
         }
         if (returnedState !== state) {
+          clearTimeout(timeoutId);
           reject(new Error("OAuth2 state mismatch — possible CSRF"));
           setTimeout(() => server.stop(), 100);
           return new Response("State mismatch. Authentication aborted.", {
             headers: { "Content-Type": "text/plain" },
           });
         }
+        clearTimeout(timeoutId);
         resolve({ code: authCode, redirectUri });
         setTimeout(() => server.stop(), 100);
         return new Response(
@@ -142,7 +148,7 @@ async function oauthCallbackFlow(
     Bun.spawn(["open", authUrl]);
     console.log("Browser opened. Complete the OAuth2 consent flow...");
 
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       reject(new Error("OAuth2 timeout — no callback received after 2 minutes"));
       server.stop();
     }, 120_000);
@@ -155,7 +161,7 @@ const program = new Command();
 program
   .name("almanac")
   .description("Google Calendar CLI")
-  .version("0.1.0")
+  .version("0.1.1")
   .addHelpText("after", `
 OVERVIEW
   Native Google Calendar CLI using the Calendar API v3 (REST/JSON).
@@ -205,13 +211,14 @@ COMPLEMENTARY TOOLS
 // ── Auth commands ───────────────────────────────────────────────
 
 program
-  .command("auth-setup <client-id> <client-secret>")
-  .description("Save OAuth2 client credentials for Google Calendar (one-time)")
+  .command("auth-setup <client-id>")
+  .description("Save OAuth2 client credentials for Google Calendar (client secret prompted securely)")
   .addHelpText("after", `
 Details:
   Stores OAuth2 app credentials in macOS Keychain (service: almanac).
   Shared across all Google accounts — run once, not per account.
   Get credentials from Google Cloud Console > APIs & Credentials.
+  The client secret is prompted securely (never passed as an argument).
 
   The Google Calendar API must be enabled in your Google Cloud project.
   Required scope: https://www.googleapis.com/auth/calendar
@@ -219,10 +226,15 @@ Details:
   Note: A redirect URI is not needed — the callback server uses a random port.
 
 Example:
-  almanac auth-setup 12345.apps.googleusercontent.com GOCSPX-xxxx
+  almanac auth-setup 12345.apps.googleusercontent.com
 `)
-  .action(async (clientId: string, clientSecret: string) => {
+  .action(async (clientId: string) => {
     try {
+      const clientSecret = await readSecret("Google OAuth2 client secret: ");
+      if (!clientSecret) {
+        showError("No client secret provided.");
+        process.exit(1);
+      }
       // Use http://localhost as placeholder — the callback server picks a random port
       saveOAuth2Credentials("almanac", clientId, clientSecret, "http://localhost");
       out.success("OAuth2 credentials saved for Google Calendar.");
@@ -321,11 +333,17 @@ accountsCmd
 
 accountsCmd
   .command("remove <alias>")
-  .description("Remove an account")
+  .description("Remove an account and purge its Keychain tokens")
   .action(async (alias: string) => {
     try {
-      removeAccount(alias);
-      out.success(`Account "${alias}" removed.`);
+      const account = resolve(alias);
+      removeAccount(account.alias);
+      // Also purge the account's OAuth tokens so no orphan secrets remain.
+      const tool = `almanac-${account.alias}`;
+      for (const key of ["access-token", "refresh-token", "expires-at"]) {
+        deleteSecret(tool, key);
+      }
+      out.success(`Account "${account.alias}" removed and Keychain tokens purged.`);
     } catch (e) {
       showError((e as Error).message);
       process.exit(1);
