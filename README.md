@@ -12,7 +12,7 @@ The name is the almanac — a calendar of days. This is an unofficial third-part
 brew install serhiitroinin/tap/almanac
 ```
 
-Or run from source with [Bun](https://bun.sh):
+Or run from source with [Bun](https://bun.sh) ≥ 1.3.9 (for the native `Bun.secrets` keychain API):
 
 ```sh
 bun install
