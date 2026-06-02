@@ -96,6 +96,7 @@ async function oauthCallbackFlow(
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const server = Bun.serve({
       port: 0,
+      hostname: "127.0.0.1", // bind to loopback only — not exposed on the LAN
       fetch(req) {
         const url = new URL(req.url);
         const error = url.searchParams.get("error");
@@ -161,7 +162,7 @@ const program = new Command();
 program
   .name("almanac")
   .description("Google Calendar CLI")
-  .version("0.1.2")
+  .version("0.1.3")
   .addHelpText("after", `
 OVERVIEW
   Native Google Calendar CLI using the Calendar API v3 (REST/JSON).
