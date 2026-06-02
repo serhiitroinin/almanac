@@ -11,7 +11,6 @@ import {
 import * as out from "./lib/output.ts";
 import { error as showError } from "./lib/output.ts";
 import { deleteSecret } from "./lib/keychain.ts";
-import { importFromLuff } from "./lib/import-luff.ts";
 import { readSecret } from "./lib/prompt.ts";
 import {
   googleCalendarProvider,
@@ -162,7 +161,7 @@ const program = new Command();
 program
   .name("almanac")
   .description("Google Calendar CLI")
-  .version("0.1.3")
+  .version("0.2.0")
   .addHelpText("after", `
 OVERVIEW
   Native Google Calendar CLI using the Calendar API v3 (REST/JSON).
@@ -237,7 +236,7 @@ Example:
         process.exit(1);
       }
       // Use http://localhost as placeholder — the callback server picks a random port
-      saveOAuth2Credentials("almanac", clientId, clientSecret, "http://localhost");
+      await saveOAuth2Credentials("almanac", clientId, clientSecret, "http://localhost");
       out.success("OAuth2 credentials saved for Google Calendar.");
       out.info("Now run: almanac auth-login <alias> for each account");
     } catch (e) {
@@ -264,7 +263,7 @@ Examples:
     try {
       const account = resolve(accountInput);
       const tool = `almanac-${account.alias}`;
-      const creds = loadOAuth2Credentials("almanac");
+      const creds = await loadOAuth2Credentials("almanac");
       const state = crypto.randomUUID();
 
       const { code, redirectUri } = await oauthCallbackFlow(
@@ -280,7 +279,7 @@ Examples:
         redirectUri,
         code,
       );
-      saveTokens(tool, tokens);
+      await saveTokens(tool, tokens);
       out.success(`Authenticated ${account.email} (tokens saved as ${tool})`);
     } catch (e) {
       showError((e as Error).message);
@@ -310,11 +309,11 @@ accountsCmd
       out.info('No Google accounts configured. Run: almanac accounts add <alias> <email>');
       return;
     }
-    const rows = accounts.map((a) => {
-      const tokens = loadTokens(`almanac-${a.alias}`);
+    const rows = await Promise.all(accounts.map(async (a) => {
+      const tokens = await loadTokens(`almanac-${a.alias}`);
       const auth = tokens ? "OK" : "MISSING";
       return [a.alias, a.email, auth];
-    });
+    }));
     out.table(["Alias", "Email", "Auth"], rows);
   });
 
@@ -342,40 +341,12 @@ accountsCmd
       // Also purge the account's OAuth tokens so no orphan secrets remain.
       const tool = `almanac-${account.alias}`;
       for (const key of ["access-token", "refresh-token", "expires-at"]) {
-        deleteSecret(tool, key);
+        await deleteSecret(tool, key);
       }
       out.success(`Account "${account.alias}" removed and Keychain tokens purged.`);
     } catch (e) {
       showError((e as Error).message);
       process.exit(1);
-    }
-  });
-
-program
-  .command("auth-import-from-luff")
-  .description("One-shot: migrate Google accounts + Keychain auth from the legacy luff cal tool")
-  .addHelpText("after", `
-Details:
-  For users migrating from the 'cal' tool shipped via the luff monorepo.
-  Copies, in order:
-    1. ~/.config/luff/accounts.json (Google only) → ~/.config/almanac/accounts.json
-    2. OAuth app credentials  luff-cal        → almanac
-    3. Per-account tokens     luff-cal-<alias> → almanac-<alias>
-  Idempotent — re-run is safe. The luff entries are NOT deleted.
-
-Example:
-  almanac auth-import-from-luff`)
-  .action(() => {
-    const { accountsImported, copied, missing } = importFromLuff();
-    if (copied.length === 0 && accountsImported === 0) {
-      showError("Nothing found under luff (no accounts.json, no luff-cal Keychain entries).");
-      process.exit(1);
-    }
-    out.success(`Imported ${accountsImported} accounts and ${copied.length} Keychain entries from luff:`);
-    for (const k of copied) console.log(`  + ${k}`);
-    if (missing.length > 0) {
-      out.blank();
-      out.info(`Missing (not present in luff): ${missing.join(", ")}`);
     }
   });
 

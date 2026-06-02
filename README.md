@@ -51,23 +51,6 @@ almanac delete s4t <id>
 almanac calendars              # list available calendars
 ```
 
-## Migrating from `luff`
-
-`almanac` was extracted from the `cal` tool in the `luff` monorepo. One command migrates
-everything:
-
-```sh
-almanac auth-import-from-luff
-```
-
-This copies your Google accounts from `~/.config/luff/accounts.json` →
-`~/.config/almanac/accounts.json`, the OAuth app credentials (`luff-cal` → `almanac`), and
-each account's tokens (`luff-cal-<alias>` → `almanac-<alias>`). Idempotent and
-non-destructive.
-
-> Note: `almanac` and the email CLI `pigeon` no longer share a single account registry as
-> the old luff `mail`/`cal` did — each keeps its own config.
-
 ## License
 
 MIT
