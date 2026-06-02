@@ -161,7 +161,7 @@ const program = new Command();
 program
   .name("almanac")
   .description("Google Calendar CLI")
-  .version("0.1.1")
+  .version("0.1.2")
   .addHelpText("after", `
 OVERVIEW
   Native Google Calendar CLI using the Calendar API v3 (REST/JSON).
@@ -170,7 +170,7 @@ OVERVIEW
 
 COMMAND CATEGORIES
   Auth:
-    auth-setup <id> <secret>        Save OAuth2 client credentials (one-time)
+    auth-setup <id>                 Save OAuth2 client credentials (secret prompted)
     auth-login <account>            OAuth2 flow for a Google account
     accounts                        Manage accounts (list / add / remove)
 

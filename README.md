@@ -28,7 +28,7 @@ authenticate:
 almanac accounts add s4t you@gmail.com
 
 # One-time OAuth2 app credentials (no redirect URI — a random-port callback is used)
-almanac auth-setup <client-id> <client-secret>
+almanac auth-setup <client-id>
 almanac auth-login s4t
 
 almanac accounts            # list accounts + auth status
