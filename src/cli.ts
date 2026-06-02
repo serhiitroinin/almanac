@@ -161,7 +161,7 @@ const program = new Command();
 program
   .name("almanac")
   .description("Google Calendar CLI")
-  .version("0.2.0")
+  .version("0.2.1")
   .addHelpText("after", `
 OVERVIEW
   Native Google Calendar CLI using the Calendar API v3 (REST/JSON).
